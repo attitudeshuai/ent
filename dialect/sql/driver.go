@@ -20,25 +20,89 @@ import (
 type Driver struct {
 	Conn
 	dialect string
+	stmts   *stmtCache
+	rt      *stmtCacheRuntime
+}
+
+// DriverOption configures a Driver.
+type DriverOption func(*driverOptions)
+
+// driverOptions holds the optional Driver configuration.
+type driverOptions struct {
+	cache *stmtCacheConfig
+}
+
+// WithStmtCache enables the declarative statement reuse chain: statements
+// are merged by their shape and parameter count, prepared once per scope,
+// reused on a hit, evicted by the declared policy when over budget, and
+// invalidated on connection failures, transaction end and schema changes.
+//
+// When the option is not applied, the execution path is identical to the
+// one without it; return types, error types and result ordering never
+// change when it is enabled.
+func WithStmtCache(opts ...StmtCacheOption) DriverOption {
+	return func(o *driverOptions) {
+		if o.cache == nil {
+			o.cache = &stmtCacheConfig{
+				maxEntries: defaultStmtCacheEntries,
+				newPolicy:  NewLRUPolicy,
+			}
+		}
+		for _, opt := range opts {
+			if opt != nil {
+				opt(o.cache)
+			}
+		}
+	}
 }
 
 // NewDriver creates a new Driver with the given Conn and dialect.
-func NewDriver(dialect string, c Conn) *Driver {
-	return &Driver{dialect: dialect, Conn: c}
+func NewDriver(dialectName string, c Conn, opts ...DriverOption) *Driver {
+	o := &driverOptions{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(o)
+		}
+	}
+	d := &Driver{dialect: dialectName, Conn: c}
+	if o.cache != nil {
+		d.rt = &stmtCacheRuntime{cfg: *o.cache, stats: &stmtStats{}}
+		d.stmts = newStmtCache(StmtCacheScopeDB, c.ExecQuerier, d.rt, nil)
+		d.Conn.stmts = d.stmts
+	}
+	return d
 }
 
 // Open wraps the database/sql.Open method and returns a dialect.Driver that implements the an ent/dialect.Driver interface.
-func Open(dialect, source string) (*Driver, error) {
-	db, err := sql.Open(dialect, source)
+func Open(dialectName, source string, opts ...DriverOption) (*Driver, error) {
+	db, err := sql.Open(dialectName, source)
 	if err != nil {
 		return nil, err
 	}
-	return NewDriver(dialect, Conn{db, dialect}), nil
+	return NewDriver(dialectName, Conn{ExecQuerier: db, dialect: dialectName}, opts...), nil
 }
 
 // OpenDB wraps the given database/sql.DB method with a Driver.
-func OpenDB(dialect string, db *sql.DB) *Driver {
-	return NewDriver(dialect, Conn{db, dialect})
+func OpenDB(dialectName string, db *sql.DB, opts ...DriverOption) *Driver {
+	return NewDriver(dialectName, Conn{ExecQuerier: db, dialect: dialectName}, opts...)
+}
+
+// StmtCacheStats returns the cumulative reuse counters and reports whether
+// the statement reuse chain is enabled.
+func (d Driver) StmtCacheStats() (StmtCacheStats, bool) {
+	if d.rt == nil {
+		return StmtCacheStats{}, false
+	}
+	return d.rt.stats.snapshot(), true
+}
+
+// InvalidateStmtCache discards every cached statement in the driver scope.
+// Transaction and pinned-connection scopes are invalidated automatically at
+// their lifecycle boundaries. It is a no-op when reuse is disabled.
+func (d Driver) InvalidateStmtCache() {
+	if d.stmts != nil {
+		d.stmts.invalidateAll(InvalidateManual)
+	}
 }
 
 // DB returns the underlying *sql.DB instance.
@@ -68,19 +132,57 @@ func (d *Driver) BeginTx(ctx context.Context, opts *TxOptions) (dialect.Tx, erro
 	if err != nil {
 		return nil, err
 	}
-	return &Tx{
-		Conn: Conn{tx, d.dialect},
-		Tx:   tx,
-	}, nil
+	t := &Tx{
+		Conn:   Conn{ExecQuerier: tx, dialect: d.dialect},
+		Tx:     tx,
+		parent: d.stmts,
+	}
+	if d.rt != nil {
+		t.Conn.stmts = newStmtCache(StmtCacheScopeTx, tx, d.rt, d.stmts)
+	}
+	return t, nil
 }
 
 // Close closes the underlying connection.
-func (d *Driver) Close() error { return d.DB().Close() }
+func (d *Driver) Close() error {
+	if d.stmts != nil {
+		d.stmts.close(InvalidateClose)
+	}
+	return d.DB().Close()
+}
 
 // Tx implements dialect.Tx interface.
 type Tx struct {
 	Conn
 	driver.Tx
+	// parent references the driver-scope cache so that DDL successfully
+	// committed inside the transaction invalidates it after commit.
+	parent *stmtCache
+}
+
+// Commit commits the transaction and discards all statements prepared in
+// its scope. DDL committed in the transaction invalidates the driver cache.
+func (t *Tx) Commit() error {
+	err := t.Tx.Commit()
+	if t.stmts != nil {
+		schemaChanged := t.stmts.consumeSchemaChange()
+		t.stmts.close(InvalidateTransactionEnd)
+		if err == nil && schemaChanged && t.parent != nil {
+			t.parent.invalidateAll(InvalidateSchemaChange)
+		}
+	}
+	return err
+}
+
+// Rollback aborts the transaction and discards all statements prepared in
+// its scope. The driver-scope cache is kept intact because rolled-back DDL
+// never changed the schema.
+func (t *Tx) Rollback() error {
+	err := t.Tx.Rollback()
+	if t.stmts != nil {
+		t.stmts.close(InvalidateTransactionEnd)
+	}
+	return err
 }
 
 // ctyVarsKey is the key used for attaching and reading the context variables.
@@ -129,6 +231,9 @@ type ExecQuerier interface {
 type Conn struct {
 	ExecQuerier
 	dialect string
+	// stmts is the scope statement cache. A nil value means statement
+	// reuse is disabled and Exec/Query take the raw path unchanged.
+	stmts *stmtCache
 }
 
 // Exec implements the dialect.Exec method.
@@ -137,26 +242,38 @@ func (c Conn) Exec(ctx context.Context, query string, args, v any) (rerr error) 
 	if !ok {
 		return fmt.Errorf("dialect/sql: invalid type %T. expect []any for args", v)
 	}
-	ex, cf, err := c.maySetVars(ctx)
+	ex, cf, cache, err := c.maySetVars(ctx)
 	if err != nil {
 		return err
 	}
 	if cf != nil {
 		defer func() { rerr = errors.Join(rerr, cf()) }()
 	}
+	// DDL is never reused (not every dialect can prepare every DDL form)
+	// and invalidates the scopes once it succeeds.
+	viaCache := cache != nil && !isDDL(query)
+	execute := func() (sql.Result, error) {
+		if viaCache {
+			return cache.Exec(ctx, query, argv)
+		}
+		return ex.ExecContext(ctx, query, argv...)
+	}
 	switch v := v.(type) {
 	case nil:
-		if _, err := ex.ExecContext(ctx, query, argv...); err != nil {
+		if _, err := execute(); err != nil {
 			return err
 		}
 	case *sql.Result:
-		res, err := ex.ExecContext(ctx, query, argv...)
+		res, err := execute()
 		if err != nil {
 			return err
 		}
 		*v = res
 	default:
 		return fmt.Errorf("dialect/sql: invalid type %T. expect *sql.Result", v)
+	}
+	if !viaCache && cache != nil && isDDL(query) {
+		c.invalidateAfterDDL(cache)
 	}
 	return nil
 }
@@ -171,11 +288,16 @@ func (c Conn) Query(ctx context.Context, query string, args, v any) error {
 	if !ok {
 		return fmt.Errorf("dialect/sql: invalid type %T. expect []any for args", args)
 	}
-	ex, cf, err := c.maySetVars(ctx)
+	ex, cf, cache, err := c.maySetVars(ctx)
 	if err != nil {
 		return err
 	}
-	rows, err := ex.QueryContext(ctx, query, argv...)
+	var rows *sql.Rows
+	if cache != nil {
+		rows, err = cache.Query(ctx, query, argv)
+	} else {
+		rows, err = ex.QueryContext(ctx, query, argv...)
+	}
 	if err != nil {
 		if cf != nil {
 			err = errors.Join(err, cf())
@@ -189,15 +311,37 @@ func (c Conn) Query(ctx context.Context, query string, args, v any) error {
 	return nil
 }
 
-// maySetVars sets the session variables before executing a query.
-func (c Conn) maySetVars(ctx context.Context) (ExecQuerier, func() error, error) {
+// invalidateAfterDDL flushes statements that may reference the old schema
+// after a successful DDL execution. Transaction scopes are flushed now and
+// remembered for a parent flush at commit; pinned-connection scopes also
+// flush the driver-scope cache immediately.
+func (c Conn) invalidateAfterDDL(cache *stmtCache) {
+	if cache == nil {
+		return
+	}
+	cache.invalidateAll(InvalidateSchemaChange)
+	if cache.scope == StmtCacheScopeTx {
+		cache.markSchemaChange()
+		return
+	}
+	if c.stmts != nil && c.stmts != cache {
+		c.stmts.invalidateAll(InvalidateSchemaChange)
+	}
+}
+
+// maySetVars sets the session variables before executing a query. It also
+// returns the statement cache effective for the execution: the Conn-scope
+// cache as-is, or a transient connection-scope cache when a *sql.Conn is
+// pinned (its entries are discarded when the connection is released).
+func (c Conn) maySetVars(ctx context.Context) (ExecQuerier, func() error, *stmtCache, error) {
 	sv, _ := ctx.Value(ctxVarsKey{}).(sessionVars)
 	if len(sv.vars) == 0 {
-		return c, nil, nil
+		return c.ExecQuerier, nil, c.stmts, nil
 	}
 	var (
 		ex    ExecQuerier  // Underlying ExecQuerier.
 		cf    func() error // Close function.
+		cache = c.stmts    // Effective statement cache.
 		reset []string     // Reset variables.
 		seen  = make(map[string]struct{}, len(sv.vars))
 	)
@@ -207,9 +351,20 @@ func (c Conn) maySetVars(ctx context.Context) (ExecQuerier, func() error, error)
 	case *sql.DB:
 		conn, err := e.Conn(ctx)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		ex, cf = conn, conn.Close
+		if c.stmts != nil {
+			// Statements prepared on the pinned connection must be closed
+			// before it returns to the pool.
+			connCache := newStmtCache(StmtCacheScopeConn, conn, c.stmts.rt, c.stmts)
+			cache = connCache
+			release := cf
+			cf = func() error {
+				connCache.close(InvalidateConnectionRelease)
+				return release()
+			}
+		}
 	}
 	for _, s := range sv.vars {
 		if _, ok := seen[s.k]; !ok {
@@ -225,7 +380,7 @@ func (c Conn) maySetVars(ctx context.Context) (ExecQuerier, func() error, error)
 			if cf != nil {
 				err = errors.Join(err, cf())
 			}
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
 	// If there are variables to reset, and we need to return the
@@ -240,7 +395,7 @@ func (c Conn) maySetVars(ctx context.Context) (ExecQuerier, func() error, error)
 			return cls()
 		}
 	}
-	return ex, cf, nil
+	return ex, cf, cache, nil
 }
 
 var _ dialect.Driver = (*Driver)(nil)
