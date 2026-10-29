@@ -373,6 +373,9 @@ func (_q *AccountQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *AccountQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Account, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*Account{}
 		_spec       = _q.querySpec()
@@ -399,6 +402,9 @@ func (_q *AccountQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Acco
 		return nodes, nil
 	}
 	if query := _q.withToken; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadToken(ctx, query, nodes,
 			func(n *Account) { n.Edges.Token = []*Token{} },
 			func(n *Account, e *Token) { n.Edges.Token = append(n.Edges.Token, e) }); err != nil {
@@ -441,6 +447,9 @@ func (_q *AccountQuery) loadToken(ctx context.Context, query *TokenQuery, nodes 
 }
 
 func (_q *AccountQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Node.Columns = _q.ctx.Fields
 	if len(_q.ctx.Fields) > 0 {
@@ -543,6 +552,9 @@ func (_g *AccountGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *AccountGroupBy) sqlScan(ctx context.Context, root *AccountQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -562,7 +574,7 @@ func (_g *AccountGroupBy) sqlScan(ctx context.Context, root *AccountQuery, v any
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -591,6 +603,9 @@ func (_s *AccountSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *AccountSelect) sqlScan(ctx context.Context, root *AccountQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -604,7 +619,7 @@ func (_s *AccountSelect) sqlScan(ctx context.Context, root *AccountQuery, v any)
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

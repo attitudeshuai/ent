@@ -331,6 +331,9 @@ func (_q *UserAuditLogQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *UserAuditLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*UserAuditLog, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes = []*UserAuditLog{}
 		_spec = _q.querySpec()
@@ -356,6 +359,9 @@ func (_q *UserAuditLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 }
 
 func (_q *UserAuditLogQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Node.Columns = _q.ctx.Fields
 	if len(_q.ctx.Fields) > 0 {
@@ -458,6 +464,9 @@ func (_g *UserAuditLogGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *UserAuditLogGroupBy) sqlScan(ctx context.Context, root *UserAuditLogQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -477,7 +486,7 @@ func (_g *UserAuditLogGroupBy) sqlScan(ctx context.Context, root *UserAuditLogQu
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -506,6 +515,9 @@ func (_s *UserAuditLogSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *UserAuditLogSelect) sqlScan(ctx context.Context, root *UserAuditLogQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -519,7 +531,7 @@ func (_s *UserAuditLogSelect) sqlScan(ctx context.Context, root *UserAuditLogQue
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

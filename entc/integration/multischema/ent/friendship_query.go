@@ -415,6 +415,9 @@ func (_q *FriendshipQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *FriendshipQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Friendship, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*Friendship{}
 		_spec       = _q.querySpec()
@@ -447,12 +450,18 @@ func (_q *FriendshipQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*F
 		return nodes, nil
 	}
 	if query := _q.withUser; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadUser(ctx, query, nodes, nil,
 			func(n *Friendship, e *User) { n.Edges.User = e }); err != nil {
 			return nil, err
 		}
 	}
 	if query := _q.withFriend; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadFriend(ctx, query, nodes, nil,
 			func(n *Friendship, e *User) { n.Edges.Friend = e }); err != nil {
 			return nil, err
@@ -521,6 +530,9 @@ func (_q *FriendshipQuery) loadFriend(ctx context.Context, query *UserQuery, nod
 }
 
 func (_q *FriendshipQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Node.Schema = _q.schemaConfig.Friendship
 	ctx = internal.NewSchemaConfigContext(ctx, _q.schemaConfig)
@@ -646,6 +658,9 @@ func (_g *FriendshipGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *FriendshipGroupBy) sqlScan(ctx context.Context, root *FriendshipQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -665,7 +680,7 @@ func (_g *FriendshipGroupBy) sqlScan(ctx context.Context, root *FriendshipQuery,
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -694,6 +709,9 @@ func (_s *FriendshipSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *FriendshipSelect) sqlScan(ctx context.Context, root *FriendshipQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -707,7 +725,7 @@ func (_s *FriendshipSelect) sqlScan(ctx context.Context, root *FriendshipQuery, 
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

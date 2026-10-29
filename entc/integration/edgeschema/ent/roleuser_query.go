@@ -334,6 +334,9 @@ func (_q *RoleUserQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *RoleUserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*RoleUser, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*RoleUser{}
 		_spec       = _q.querySpec()
@@ -361,12 +364,18 @@ func (_q *RoleUserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Rol
 		return nodes, nil
 	}
 	if query := _q.withRole; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadRole(ctx, query, nodes, nil,
 			func(n *RoleUser, e *Role) { n.Edges.Role = e }); err != nil {
 			return nil, err
 		}
 	}
 	if query := _q.withUser; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadUser(ctx, query, nodes, nil,
 			func(n *RoleUser, e *User) { n.Edges.User = e }); err != nil {
 			return nil, err
@@ -435,6 +444,9 @@ func (_q *RoleUserQuery) loadUser(ctx context.Context, query *UserQuery, nodes [
 }
 
 func (_q *RoleUserQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Unique = false
 	_spec.Node.Columns = nil
@@ -538,6 +550,9 @@ func (_g *RoleUserGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *RoleUserGroupBy) sqlScan(ctx context.Context, root *RoleUserQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -557,7 +572,7 @@ func (_g *RoleUserGroupBy) sqlScan(ctx context.Context, root *RoleUserQuery, v a
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -586,6 +601,9 @@ func (_s *RoleUserSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *RoleUserSelect) sqlScan(ctx context.Context, root *RoleUserQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -599,7 +617,7 @@ func (_s *RoleUserSelect) sqlScan(ctx context.Context, root *RoleUserQuery, v an
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

@@ -772,6 +772,9 @@ func (_q *UserQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*User{}
 		_spec       = _q.querySpec()
@@ -809,6 +812,9 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		return nodes, nil
 	}
 	if query := _q.withGroups; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadGroups(ctx, query, nodes,
 			func(n *User) { n.Edges.Groups = []*Group{} },
 			func(n *User, e *Group) { n.Edges.Groups = append(n.Edges.Groups, e) }); err != nil {
@@ -816,6 +822,9 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		}
 	}
 	if query := _q.withFriends; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadFriends(ctx, query, nodes,
 			func(n *User) { n.Edges.Friends = []*User{} },
 			func(n *User, e *User) { n.Edges.Friends = append(n.Edges.Friends, e) }); err != nil {
@@ -823,6 +832,9 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		}
 	}
 	if query := _q.withRelatives; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadRelatives(ctx, query, nodes,
 			func(n *User) { n.Edges.Relatives = []*User{} },
 			func(n *User, e *User) { n.Edges.Relatives = append(n.Edges.Relatives, e) }); err != nil {
@@ -830,6 +842,9 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		}
 	}
 	if query := _q.withLikedTweets; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadLikedTweets(ctx, query, nodes,
 			func(n *User) { n.Edges.LikedTweets = []*Tweet{} },
 			func(n *User, e *Tweet) { n.Edges.LikedTweets = append(n.Edges.LikedTweets, e) }); err != nil {
@@ -837,6 +852,9 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		}
 	}
 	if query := _q.withTweets; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadTweets(ctx, query, nodes,
 			func(n *User) { n.Edges.Tweets = []*Tweet{} },
 			func(n *User, e *Tweet) { n.Edges.Tweets = append(n.Edges.Tweets, e) }); err != nil {
@@ -844,6 +862,9 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		}
 	}
 	if query := _q.withRoles; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadRoles(ctx, query, nodes,
 			func(n *User) { n.Edges.Roles = []*Role{} },
 			func(n *User, e *Role) { n.Edges.Roles = append(n.Edges.Roles, e) }); err != nil {
@@ -851,6 +872,9 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		}
 	}
 	if query := _q.withJoinedGroups; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadJoinedGroups(ctx, query, nodes,
 			func(n *User) { n.Edges.JoinedGroups = []*UserGroup{} },
 			func(n *User, e *UserGroup) { n.Edges.JoinedGroups = append(n.Edges.JoinedGroups, e) }); err != nil {
@@ -858,6 +882,9 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		}
 	}
 	if query := _q.withFriendships; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadFriendships(ctx, query, nodes,
 			func(n *User) { n.Edges.Friendships = []*Friendship{} },
 			func(n *User, e *Friendship) { n.Edges.Friendships = append(n.Edges.Friendships, e) }); err != nil {
@@ -865,6 +892,9 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		}
 	}
 	if query := _q.withRelationship; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadRelationship(ctx, query, nodes,
 			func(n *User) { n.Edges.Relationship = []*Relationship{} },
 			func(n *User, e *Relationship) { n.Edges.Relationship = append(n.Edges.Relationship, e) }); err != nil {
@@ -872,6 +902,9 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		}
 	}
 	if query := _q.withLikes; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadLikes(ctx, query, nodes,
 			func(n *User) { n.Edges.Likes = []*TweetLike{} },
 			func(n *User, e *TweetLike) { n.Edges.Likes = append(n.Edges.Likes, e) }); err != nil {
@@ -879,6 +912,9 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		}
 	}
 	if query := _q.withUserTweets; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadUserTweets(ctx, query, nodes,
 			func(n *User) { n.Edges.UserTweets = []*UserTweet{} },
 			func(n *User, e *UserTweet) { n.Edges.UserTweets = append(n.Edges.UserTweets, e) }); err != nil {
@@ -886,6 +922,9 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		}
 	}
 	if query := _q.withRolesUsers; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadRolesUsers(ctx, query, nodes,
 			func(n *User) { n.Edges.RolesUsers = []*RoleUser{} },
 			func(n *User, e *RoleUser) { n.Edges.RolesUsers = append(n.Edges.RolesUsers, e) }); err != nil {
@@ -1443,6 +1482,9 @@ func (_q *UserQuery) loadRolesUsers(ctx context.Context, query *RoleUserQuery, n
 }
 
 func (_q *UserQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Node.Columns = _q.ctx.Fields
 	if len(_q.ctx.Fields) > 0 {
@@ -1545,6 +1587,9 @@ func (_g *UserGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *UserGroupBy) sqlScan(ctx context.Context, root *UserQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -1564,7 +1609,7 @@ func (_g *UserGroupBy) sqlScan(ctx context.Context, root *UserQuery, v any) erro
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -1593,6 +1638,9 @@ func (_s *UserSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *UserSelect) sqlScan(ctx context.Context, root *UserQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -1606,7 +1654,7 @@ func (_s *UserSelect) sqlScan(ctx context.Context, root *UserQuery, v any) error
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

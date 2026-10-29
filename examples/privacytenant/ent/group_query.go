@@ -415,6 +415,9 @@ func (_q *GroupQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *GroupQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Group, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*Group{}
 		_spec       = _q.querySpec()
@@ -442,12 +445,18 @@ func (_q *GroupQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Group,
 		return nodes, nil
 	}
 	if query := _q.withTenant; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadTenant(ctx, query, nodes, nil,
 			func(n *Group, e *Tenant) { n.Edges.Tenant = e }); err != nil {
 			return nil, err
 		}
 	}
 	if query := _q.withUsers; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadUsers(ctx, query, nodes,
 			func(n *Group) { n.Edges.Users = []*User{} },
 			func(n *Group, e *User) { n.Edges.Users = append(n.Edges.Users, e) }); err != nil {
@@ -549,6 +558,9 @@ func (_q *GroupQuery) loadUsers(ctx context.Context, query *UserQuery, nodes []*
 }
 
 func (_q *GroupQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Node.Columns = _q.ctx.Fields
 	if len(_q.ctx.Fields) > 0 {
@@ -654,6 +666,9 @@ func (_g *GroupGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *GroupGroupBy) sqlScan(ctx context.Context, root *GroupQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -673,7 +688,7 @@ func (_g *GroupGroupBy) sqlScan(ctx context.Context, root *GroupQuery, v any) er
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -702,6 +717,9 @@ func (_s *GroupSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *GroupSelect) sqlScan(ctx context.Context, root *GroupQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -715,7 +733,7 @@ func (_s *GroupSelect) sqlScan(ctx context.Context, root *GroupQuery, v any) err
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

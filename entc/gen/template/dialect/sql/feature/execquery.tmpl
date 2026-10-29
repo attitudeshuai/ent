@@ -47,6 +47,9 @@ in the LICENSE file in the root directory of this source tree.
         // ExecContext allows calling the underlying ExecContext method of the transaction if it is supported by it.
         // See, database/sql#Tx.ExecContext for more information.
         func (tx *txDriver) ExecContext(ctx context.Context, query string, args ...any) (stdsql.Result, error) {
+        	if err := tx.errAborted(); err != nil {
+        		return nil, err
+        	}
         	ex, ok := tx.tx.(interface {
         		ExecContext(context.Context, string, ...any) (stdsql.Result, error)
         	})
@@ -59,6 +62,9 @@ in the LICENSE file in the root directory of this source tree.
         // QueryContext allows calling the underlying QueryContext method of the transaction if it is supported by it.
         // See, database/sql#Tx.QueryContext for more information.
         func (tx *txDriver)  QueryContext(ctx context.Context, query string, args ...any) (*stdsql.Rows, error) {
+        	if err := tx.errAborted(); err != nil {
+        		return nil, err
+        	}
         	q, ok := tx.tx.(interface {
         		QueryContext(context.Context, string, ...any) (*stdsql.Rows, error)
         	})

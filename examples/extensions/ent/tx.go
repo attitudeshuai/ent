@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"entgo.io/ent/dialect"
@@ -59,6 +60,15 @@ func (f CommitFunc) Commit(ctx context.Context, tx *Tx) error {
 // Commit commits the transaction.
 func (tx *Tx) Commit() error {
 	txDriver := tx.config.driver.(*txDriver)
+	// A transaction that was aborted by a canceled read or an exceeded
+	// deadline is non-continuable and cannot be committed. The caller
+	// must roll it back explicitly.
+	txDriver.mu.Lock()
+	aborted := txDriver.aborted
+	txDriver.mu.Unlock()
+	if aborted != nil {
+		return errors.Join(dialect.ErrTxAborted, aborted)
+	}
 	var fn Committer = CommitFunc(func(context.Context, *Tx) error {
 		return txDriver.tx.Commit()
 	})
@@ -168,6 +178,12 @@ type txDriver struct {
 	mu         sync.Mutex
 	onCommit   []CommitHook
 	onRollback []RollbackHook
+	// aborted holds the error that terminated a logical read running on
+	// this transaction (context cancellation or deadline exceeded). Once
+	// set, the transaction is non-continuable: no further statements are
+	// sent, and Commit returns an error. It is never rolled back here;
+	// the caller must call Tx.Rollback to finalize the transaction.
+	aborted error
 }
 
 // newTx creates a new transactional driver.
@@ -197,14 +213,43 @@ func (*txDriver) Commit() error { return nil }
 // User must call `Tx.Rollback` in order to rollback the transaction.
 func (*txDriver) Rollback() error { return nil }
 
+// Abort marks the transaction non-continuable after a logical read was
+// canceled or timed out. It does not commit or roll back; the first abort
+// error is retained and reported by subsequent statements and by Commit.
+func (tx *txDriver) Abort(err error) {
+	tx.mu.Lock()
+	defer tx.mu.Unlock()
+	if tx.aborted == nil && err != nil {
+		tx.aborted = err
+	}
+}
+
+// errAborted returns dialect.ErrTxAborted (joined with the abort error)
+// when the transaction is no longer continuable.
+func (tx *txDriver) errAborted() error {
+	tx.mu.Lock()
+	defer tx.mu.Unlock()
+	if tx.aborted != nil {
+		return errors.Join(dialect.ErrTxAborted, tx.aborted)
+	}
+	return nil
+}
+
 // Exec calls tx.Exec.
 func (tx *txDriver) Exec(ctx context.Context, query string, args, v any) error {
+	if err := tx.errAborted(); err != nil {
+		return err
+	}
 	return tx.tx.Exec(ctx, query, args, v)
 }
 
 // Query calls tx.Query.
 func (tx *txDriver) Query(ctx context.Context, query string, args, v any) error {
+	if err := tx.errAborted(); err != nil {
+		return err
+	}
 	return tx.tx.Query(ctx, query, args, v)
 }
 
 var _ dialect.Driver = (*txDriver)(nil)
+var _ dialect.Abortable = (*txDriver)(nil)

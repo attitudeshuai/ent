@@ -338,6 +338,9 @@ func (_q *LicenseQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *LicenseQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*License, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes = []*License{}
 		_spec = _q.querySpec()
@@ -366,6 +369,9 @@ func (_q *LicenseQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Lice
 }
 
 func (_q *LicenseQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	if len(_q.modifiers) > 0 {
 		_spec.Modifiers = _q.modifiers
@@ -506,6 +512,9 @@ func (_g *LicenseGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *LicenseGroupBy) sqlScan(ctx context.Context, root *LicenseQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -525,7 +534,7 @@ func (_g *LicenseGroupBy) sqlScan(ctx context.Context, root *LicenseQuery, v any
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -554,6 +563,9 @@ func (_s *LicenseSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *LicenseSelect) sqlScan(ctx context.Context, root *LicenseQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -567,7 +579,7 @@ func (_s *LicenseSelect) sqlScan(ctx context.Context, root *LicenseQuery, v any)
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

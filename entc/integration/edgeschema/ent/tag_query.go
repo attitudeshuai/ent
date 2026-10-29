@@ -480,6 +480,9 @@ func (_q *TagQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *TagQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tag, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*Tag{}
 		_spec       = _q.querySpec()
@@ -509,6 +512,9 @@ func (_q *TagQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tag, err
 		return nodes, nil
 	}
 	if query := _q.withTweets; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadTweets(ctx, query, nodes,
 			func(n *Tag) { n.Edges.Tweets = []*Tweet{} },
 			func(n *Tag, e *Tweet) { n.Edges.Tweets = append(n.Edges.Tweets, e) }); err != nil {
@@ -516,6 +522,9 @@ func (_q *TagQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tag, err
 		}
 	}
 	if query := _q.withGroups; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadGroups(ctx, query, nodes,
 			func(n *Tag) { n.Edges.Groups = []*Group{} },
 			func(n *Tag, e *Group) { n.Edges.Groups = append(n.Edges.Groups, e) }); err != nil {
@@ -523,6 +532,9 @@ func (_q *TagQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tag, err
 		}
 	}
 	if query := _q.withTweetTags; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadTweetTags(ctx, query, nodes,
 			func(n *Tag) { n.Edges.TweetTags = []*TweetTag{} },
 			func(n *Tag, e *TweetTag) { n.Edges.TweetTags = append(n.Edges.TweetTags, e) }); err != nil {
@@ -530,6 +542,9 @@ func (_q *TagQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tag, err
 		}
 	}
 	if query := _q.withGroupTags; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadGroupTags(ctx, query, nodes,
 			func(n *Tag) { n.Edges.GroupTags = []*GroupTag{} },
 			func(n *Tag, e *GroupTag) { n.Edges.GroupTags = append(n.Edges.GroupTags, e) }); err != nil {
@@ -723,6 +738,9 @@ func (_q *TagQuery) loadGroupTags(ctx context.Context, query *GroupTagQuery, nod
 }
 
 func (_q *TagQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Node.Columns = _q.ctx.Fields
 	if len(_q.ctx.Fields) > 0 {
@@ -825,6 +843,9 @@ func (_g *TagGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *TagGroupBy) sqlScan(ctx context.Context, root *TagQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -844,7 +865,7 @@ func (_g *TagGroupBy) sqlScan(ctx context.Context, root *TagQuery, v any) error 
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -873,6 +894,9 @@ func (_s *TagSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *TagSelect) sqlScan(ctx context.Context, root *TagQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -886,7 +910,7 @@ func (_s *TagSelect) sqlScan(ctx context.Context, root *TagQuery, v any) error {
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

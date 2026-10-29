@@ -372,6 +372,9 @@ func (_q *StreetQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *StreetQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Street, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*Street{}
 		withFKs     = _q.withFKs
@@ -405,6 +408,9 @@ func (_q *StreetQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Stree
 		return nodes, nil
 	}
 	if query := _q.withCity; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadCity(ctx, query, nodes, nil,
 			func(n *Street, e *City) { n.Edges.City = e }); err != nil {
 			return nil, err
@@ -447,6 +453,9 @@ func (_q *StreetQuery) loadCity(ctx context.Context, query *CityQuery, nodes []*
 }
 
 func (_q *StreetQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Node.Columns = _q.ctx.Fields
 	if len(_q.ctx.Fields) > 0 {
@@ -549,6 +558,9 @@ func (_g *StreetGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *StreetGroupBy) sqlScan(ctx context.Context, root *StreetQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -568,7 +580,7 @@ func (_g *StreetGroupBy) sqlScan(ctx context.Context, root *StreetQuery, v any) 
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -597,6 +609,9 @@ func (_s *StreetSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *StreetSelect) sqlScan(ctx context.Context, root *StreetQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -610,7 +625,7 @@ func (_s *StreetSelect) sqlScan(ctx context.Context, root *StreetQuery, v any) e
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

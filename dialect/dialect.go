@@ -8,11 +8,32 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"log"
 
 	"github.com/google/uuid"
 )
+
+// ErrTxAborted is returned by transactional drivers once the transaction
+// has been marked non-continuable, for example after a read was canceled
+// or its deadline was exceeded.
+var ErrTxAborted = errors.New("dialect: transaction aborted")
+
+// Abortable is an optional interface implemented by drivers that can be
+// marked as non-continuable after a logical read was terminated by a
+// canceled context or an exceeded deadline.
+//
+// Transactional drivers typically implement it: aborting a read inside a
+// transaction must prevent any further statements from being sent and must
+// prevent the transaction from being committed. Implementations must not
+// commit or roll back the underlying transaction on Abort; the caller
+// remains responsible for finalizing it.
+type Abortable interface {
+	// Abort marks the driver as terminated with the given abort error.
+	// The first non-nil abort error is retained.
+	Abort(err error)
+}
 
 // Dialect names for external usage.
 const (

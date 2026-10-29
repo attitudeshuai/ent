@@ -415,6 +415,9 @@ func (_q *ParentQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *ParentQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Parent, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*Parent{}
 		_spec       = _q.querySpec()
@@ -447,12 +450,18 @@ func (_q *ParentQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Paren
 		return nodes, nil
 	}
 	if query := _q.withChild; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadChild(ctx, query, nodes, nil,
 			func(n *Parent, e *User) { n.Edges.Child = e }); err != nil {
 			return nil, err
 		}
 	}
 	if query := _q.withParent; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadParent(ctx, query, nodes, nil,
 			func(n *Parent, e *User) { n.Edges.Parent = e }); err != nil {
 			return nil, err
@@ -521,6 +530,9 @@ func (_q *ParentQuery) loadParent(ctx context.Context, query *UserQuery, nodes [
 }
 
 func (_q *ParentQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Node.Schema = _q.schemaConfig.Parent
 	ctx = internal.NewSchemaConfigContext(ctx, _q.schemaConfig)
@@ -646,6 +658,9 @@ func (_g *ParentGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *ParentGroupBy) sqlScan(ctx context.Context, root *ParentQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -665,7 +680,7 @@ func (_g *ParentGroupBy) sqlScan(ctx context.Context, root *ParentQuery, v any) 
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -694,6 +709,9 @@ func (_s *ParentSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *ParentSelect) sqlScan(ctx context.Context, root *ParentQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -707,7 +725,7 @@ func (_s *ParentSelect) sqlScan(ctx context.Context, root *ParentQuery, v any) e
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

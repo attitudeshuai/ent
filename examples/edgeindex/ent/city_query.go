@@ -372,6 +372,9 @@ func (_q *CityQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *CityQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*City, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*City{}
 		_spec       = _q.querySpec()
@@ -398,6 +401,9 @@ func (_q *CityQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*City, e
 		return nodes, nil
 	}
 	if query := _q.withStreets; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadStreets(ctx, query, nodes,
 			func(n *City) { n.Edges.Streets = []*Street{} },
 			func(n *City, e *Street) { n.Edges.Streets = append(n.Edges.Streets, e) }); err != nil {
@@ -440,6 +446,9 @@ func (_q *CityQuery) loadStreets(ctx context.Context, query *StreetQuery, nodes 
 }
 
 func (_q *CityQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Node.Columns = _q.ctx.Fields
 	if len(_q.ctx.Fields) > 0 {
@@ -542,6 +551,9 @@ func (_g *CityGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *CityGroupBy) sqlScan(ctx context.Context, root *CityQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -561,7 +573,7 @@ func (_g *CityGroupBy) sqlScan(ctx context.Context, root *CityQuery, v any) erro
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -590,6 +602,9 @@ func (_s *CitySelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *CitySelect) sqlScan(ctx context.Context, root *CityQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -603,7 +618,7 @@ func (_s *CitySelect) sqlScan(ctx context.Context, root *CityQuery, v any) error
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

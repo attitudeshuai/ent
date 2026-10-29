@@ -351,6 +351,9 @@ func (_q *SessionQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *SessionQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Session, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*Session{}
 		withFKs     = _q.withFKs
@@ -384,6 +387,9 @@ func (_q *SessionQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Sess
 		return nodes, nil
 	}
 	if query := _q.withDevice; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadDevice(ctx, query, nodes, nil,
 			func(n *Session, e *Device) { n.Edges.Device = e }); err != nil {
 			return nil, err
@@ -426,6 +432,9 @@ func (_q *SessionQuery) loadDevice(ctx context.Context, query *DeviceQuery, node
 }
 
 func (_q *SessionQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Node.Columns = _q.ctx.Fields
 	if len(_q.ctx.Fields) > 0 {
@@ -528,6 +537,9 @@ func (_g *SessionGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *SessionGroupBy) sqlScan(ctx context.Context, root *SessionQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -547,7 +559,7 @@ func (_g *SessionGroupBy) sqlScan(ctx context.Context, root *SessionQuery, v any
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -576,6 +588,9 @@ func (_s *SessionSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *SessionSelect) sqlScan(ctx context.Context, root *SessionQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -589,7 +604,7 @@ func (_s *SessionSelect) sqlScan(ctx context.Context, root *SessionQuery, v any)
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

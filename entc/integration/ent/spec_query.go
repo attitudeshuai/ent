@@ -354,6 +354,9 @@ func (_q *SpecQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *SpecQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Spec, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*Spec{}
 		_spec       = _q.querySpec()
@@ -383,6 +386,9 @@ func (_q *SpecQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Spec, e
 		return nodes, nil
 	}
 	if query := _q.withCard; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadCard(ctx, query, nodes,
 			func(n *Spec) { n.Edges.Card = []*Card{} },
 			func(n *Spec, e *Card) { n.Edges.Card = append(n.Edges.Card, e) }); err != nil {
@@ -462,6 +468,9 @@ func (_q *SpecQuery) loadCard(ctx context.Context, query *CardQuery, nodes []*Sp
 }
 
 func (_q *SpecQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	if len(_q.modifiers) > 0 {
 		_spec.Modifiers = _q.modifiers
@@ -616,6 +625,9 @@ func (_g *SpecGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *SpecGroupBy) sqlScan(ctx context.Context, root *SpecQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -635,7 +647,7 @@ func (_g *SpecGroupBy) sqlScan(ctx context.Context, root *SpecQuery, v any) erro
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -664,6 +676,9 @@ func (_s *SpecSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *SpecSelect) sqlScan(ctx context.Context, root *SpecQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -677,7 +692,7 @@ func (_s *SpecSelect) sqlScan(ctx context.Context, root *SpecQuery, v any) error
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

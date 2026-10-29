@@ -376,6 +376,9 @@ func (_q *FileTypeQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *FileTypeQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*FileType, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*FileType{}
 		_spec       = _q.querySpec()
@@ -405,6 +408,9 @@ func (_q *FileTypeQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Fil
 		return nodes, nil
 	}
 	if query := _q.withFiles; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadFiles(ctx, query, nodes,
 			func(n *FileType) { n.Edges.Files = []*File{} },
 			func(n *FileType, e *File) {
@@ -464,6 +470,9 @@ func (_q *FileTypeQuery) loadFiles(ctx context.Context, query *FileQuery, nodes 
 }
 
 func (_q *FileTypeQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	if len(_q.modifiers) > 0 {
 		_spec.Modifiers = _q.modifiers
@@ -618,6 +627,9 @@ func (_g *FileTypeGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *FileTypeGroupBy) sqlScan(ctx context.Context, root *FileTypeQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -637,7 +649,7 @@ func (_g *FileTypeGroupBy) sqlScan(ctx context.Context, root *FileTypeQuery, v a
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -666,6 +678,9 @@ func (_s *FileTypeSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *FileTypeSelect) sqlScan(ctx context.Context, root *FileTypeQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -679,7 +694,7 @@ func (_s *FileTypeSelect) sqlScan(ctx context.Context, root *FileTypeQuery, v an
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

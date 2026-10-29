@@ -415,6 +415,9 @@ func (_q *TeamQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *TeamQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Team, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*Team{}
 		_spec       = _q.querySpec()
@@ -442,6 +445,9 @@ func (_q *TeamQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Team, e
 		return nodes, nil
 	}
 	if query := _q.withTasks; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadTasks(ctx, query, nodes,
 			func(n *Team) { n.Edges.Tasks = []*Task{} },
 			func(n *Team, e *Task) { n.Edges.Tasks = append(n.Edges.Tasks, e) }); err != nil {
@@ -449,6 +455,9 @@ func (_q *TeamQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Team, e
 		}
 	}
 	if query := _q.withUsers; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadUsers(ctx, query, nodes,
 			func(n *Team) { n.Edges.Users = []*User{} },
 			func(n *Team, e *User) { n.Edges.Users = append(n.Edges.Users, e) }); err != nil {
@@ -582,6 +591,9 @@ func (_q *TeamQuery) loadUsers(ctx context.Context, query *UserQuery, nodes []*T
 }
 
 func (_q *TeamQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Node.Columns = _q.ctx.Fields
 	if len(_q.ctx.Fields) > 0 {
@@ -684,6 +696,9 @@ func (_g *TeamGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *TeamGroupBy) sqlScan(ctx context.Context, root *TeamQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -703,7 +718,7 @@ func (_g *TeamGroupBy) sqlScan(ctx context.Context, root *TeamQuery, v any) erro
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -732,6 +747,9 @@ func (_s *TeamSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *TeamSelect) sqlScan(ctx context.Context, root *TeamQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -745,7 +763,7 @@ func (_s *TeamSelect) sqlScan(ctx context.Context, root *TeamQuery, v any) error
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

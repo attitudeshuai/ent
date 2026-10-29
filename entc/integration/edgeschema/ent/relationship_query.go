@@ -376,6 +376,9 @@ func (_q *RelationshipQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *RelationshipQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Relationship, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*Relationship{}
 		_spec       = _q.querySpec()
@@ -404,18 +407,27 @@ func (_q *RelationshipQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 		return nodes, nil
 	}
 	if query := _q.withUser; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadUser(ctx, query, nodes, nil,
 			func(n *Relationship, e *User) { n.Edges.User = e }); err != nil {
 			return nil, err
 		}
 	}
 	if query := _q.withRelative; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadRelative(ctx, query, nodes, nil,
 			func(n *Relationship, e *User) { n.Edges.Relative = e }); err != nil {
 			return nil, err
 		}
 	}
 	if query := _q.withInfo; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadInfo(ctx, query, nodes, nil,
 			func(n *Relationship, e *RelationshipInfo) { n.Edges.Info = e }); err != nil {
 			return nil, err
@@ -513,6 +525,9 @@ func (_q *RelationshipQuery) loadInfo(ctx context.Context, query *RelationshipIn
 }
 
 func (_q *RelationshipQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Unique = false
 	_spec.Node.Columns = nil
@@ -619,6 +634,9 @@ func (_g *RelationshipGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *RelationshipGroupBy) sqlScan(ctx context.Context, root *RelationshipQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -638,7 +656,7 @@ func (_g *RelationshipGroupBy) sqlScan(ctx context.Context, root *RelationshipQu
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -667,6 +685,9 @@ func (_s *RelationshipSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *RelationshipSelect) sqlScan(ctx context.Context, root *RelationshipQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -680,7 +701,7 @@ func (_s *RelationshipSelect) sqlScan(ctx context.Context, root *RelationshipQue
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

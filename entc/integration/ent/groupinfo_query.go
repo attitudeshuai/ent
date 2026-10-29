@@ -376,6 +376,9 @@ func (_q *GroupInfoQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *GroupInfoQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*GroupInfo, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*GroupInfo{}
 		_spec       = _q.querySpec()
@@ -405,6 +408,9 @@ func (_q *GroupInfoQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Gr
 		return nodes, nil
 	}
 	if query := _q.withGroups; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadGroups(ctx, query, nodes,
 			func(n *GroupInfo) { n.Edges.Groups = []*Group{} },
 			func(n *GroupInfo, e *Group) {
@@ -464,6 +470,9 @@ func (_q *GroupInfoQuery) loadGroups(ctx context.Context, query *GroupQuery, nod
 }
 
 func (_q *GroupInfoQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	if len(_q.modifiers) > 0 {
 		_spec.Modifiers = _q.modifiers
@@ -618,6 +627,9 @@ func (_g *GroupInfoGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *GroupInfoGroupBy) sqlScan(ctx context.Context, root *GroupInfoQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -637,7 +649,7 @@ func (_g *GroupInfoGroupBy) sqlScan(ctx context.Context, root *GroupInfoQuery, v
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -666,6 +678,9 @@ func (_s *GroupInfoSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *GroupInfoSelect) sqlScan(ctx context.Context, root *GroupInfoQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -679,7 +694,7 @@ func (_s *GroupInfoSelect) sqlScan(ctx context.Context, root *GroupInfoQuery, v 
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

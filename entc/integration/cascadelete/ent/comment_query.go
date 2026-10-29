@@ -371,6 +371,9 @@ func (_q *CommentQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *CommentQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Comment, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*Comment{}
 		_spec       = _q.querySpec()
@@ -397,6 +400,9 @@ func (_q *CommentQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Comm
 		return nodes, nil
 	}
 	if query := _q.withPost; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadPost(ctx, query, nodes, nil,
 			func(n *Comment, e *Post) { n.Edges.Post = e }); err != nil {
 			return nil, err
@@ -436,6 +442,9 @@ func (_q *CommentQuery) loadPost(ctx context.Context, query *PostQuery, nodes []
 }
 
 func (_q *CommentQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Node.Columns = _q.ctx.Fields
 	if len(_q.ctx.Fields) > 0 {
@@ -541,6 +550,9 @@ func (_g *CommentGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *CommentGroupBy) sqlScan(ctx context.Context, root *CommentQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -560,7 +572,7 @@ func (_g *CommentGroupBy) sqlScan(ctx context.Context, root *CommentQuery, v any
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -589,6 +601,9 @@ func (_s *CommentSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *CommentSelect) sqlScan(ctx context.Context, root *CommentQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -602,7 +617,7 @@ func (_s *CommentSelect) sqlScan(ctx context.Context, root *CommentQuery, v any)
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

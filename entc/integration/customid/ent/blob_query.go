@@ -444,6 +444,9 @@ func (_q *BlobQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *BlobQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Blob, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*Blob{}
 		withFKs     = _q.withFKs
@@ -479,12 +482,18 @@ func (_q *BlobQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Blob, e
 		return nodes, nil
 	}
 	if query := _q.withParent; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadParent(ctx, query, nodes, nil,
 			func(n *Blob, e *Blob) { n.Edges.Parent = e }); err != nil {
 			return nil, err
 		}
 	}
 	if query := _q.withLinks; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadLinks(ctx, query, nodes,
 			func(n *Blob) { n.Edges.Links = []*Blob{} },
 			func(n *Blob, e *Blob) { n.Edges.Links = append(n.Edges.Links, e) }); err != nil {
@@ -492,6 +501,9 @@ func (_q *BlobQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Blob, e
 		}
 	}
 	if query := _q.withBlobLinks; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadBlobLinks(ctx, query, nodes,
 			func(n *Blob) { n.Edges.BlobLinks = []*BlobLink{} },
 			func(n *Blob, e *BlobLink) { n.Edges.BlobLinks = append(n.Edges.BlobLinks, e) }); err != nil {
@@ -626,6 +638,9 @@ func (_q *BlobQuery) loadBlobLinks(ctx context.Context, query *BlobLinkQuery, no
 }
 
 func (_q *BlobQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Node.Columns = _q.ctx.Fields
 	if len(_q.ctx.Fields) > 0 {
@@ -728,6 +743,9 @@ func (_g *BlobGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *BlobGroupBy) sqlScan(ctx context.Context, root *BlobQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -747,7 +765,7 @@ func (_g *BlobGroupBy) sqlScan(ctx context.Context, root *BlobQuery, v any) erro
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -776,6 +794,9 @@ func (_s *BlobSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *BlobSelect) sqlScan(ctx context.Context, root *BlobQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -789,7 +810,7 @@ func (_s *BlobSelect) sqlScan(ctx context.Context, root *BlobQuery, v any) error
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

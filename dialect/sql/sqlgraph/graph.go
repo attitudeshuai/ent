@@ -935,16 +935,24 @@ func NewQuerySpec(table string, columns []string, id *FieldSpec) *QuerySpec {
 
 // QueryNodes queries the nodes in the graph query and scans them to the given values.
 func QueryNodes(ctx context.Context, drv dialect.Driver, spec *QuerySpec) error {
+	r, err := beginRead(ctx, drv, OpQueryNodes, spec.Node.Table)
+	if err != nil {
+		return err
+	}
 	builder := sql.Dialect(drv.Dialect())
 	qr := &query{graph: graph{builder: builder}, QuerySpec: spec}
-	return qr.nodes(ctx, drv)
+	return qr.nodes(ctx, drv, r)
 }
 
 // CountNodes counts the nodes in the given graph query.
 func CountNodes(ctx context.Context, drv dialect.Driver, spec *QuerySpec) (int, error) {
+	r, err := beginRead(ctx, drv, OpCountNodes, spec.Node.Table)
+	if err != nil {
+		return 0, err
+	}
 	builder := sql.Dialect(drv.Dialect())
 	qr := &query{graph: graph{builder: builder}, QuerySpec: spec}
-	return qr.count(ctx, drv)
+	return qr.count(ctx, drv, r)
 }
 
 // EdgeQuerySpec holds the information for querying
@@ -961,6 +969,10 @@ func QueryEdges(ctx context.Context, drv dialect.Driver, spec *EdgeQuerySpec) er
 	if len(spec.Edge.Columns) != 2 {
 		return fmt.Errorf("sqlgraph: edge query requires 2 columns (out, in)")
 	}
+	r, err := beginRead(ctx, drv, OpQueryEdges, spec.Edge.Table)
+	if err != nil {
+		return err
+	}
 	out, in := spec.Edge.Columns[0], spec.Edge.Columns[1]
 	if spec.Edge.Inverse {
 		out, in = in, out
@@ -973,20 +985,20 @@ func QueryEdges(ctx context.Context, drv dialect.Driver, spec *EdgeQuerySpec) er
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := drv.Query(ctx, query, args, rows); err != nil {
+	if err := r.query(StageStatement, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		values := spec.ScanValues()
 		if err := rows.Scan(values[0], values[1]); err != nil {
-			return err
+			return r.fail(StageScan, err)
 		}
 		if err := spec.Assign(values[0], values[1]); err != nil {
 			return err
 		}
 	}
-	return rows.Err()
+	return r.fail(StageScan, rows.Err())
 }
 
 type query struct {
@@ -994,20 +1006,20 @@ type query struct {
 	*QuerySpec
 }
 
-func (q *query) nodes(ctx context.Context, drv dialect.Driver) error {
+func (q *query) nodes(ctx context.Context, drv dialect.Driver, r *readExec) error {
 	rows := &sql.Rows{}
 	selector, err := q.selector(ctx)
 	if err != nil {
 		return err
 	}
 	query, args := selector.Query()
-	if err := drv.Query(ctx, query, args, rows); err != nil {
+	if err := r.query(StageStatement, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
 	columns, err := rows.Columns()
 	if err != nil {
-		return err
+		return r.fail(StageScan, err)
 	}
 	for rows.Next() {
 		values, err := q.ScanValues(columns)
@@ -1020,16 +1032,16 @@ func (q *query) nodes(ctx context.Context, drv dialect.Driver) error {
 			}
 		}
 		if err := rows.Scan(values...); err != nil {
-			return err
+			return r.fail(StageScan, err)
 		}
 		if err := q.Assign(columns, values); err != nil {
 			return err
 		}
 	}
-	return rows.Err()
+	return r.fail(StageScan, rows.Err())
 }
 
-func (q *query) count(ctx context.Context, drv dialect.Driver) (int, error) {
+func (q *query) count(ctx context.Context, drv dialect.Driver, r *readExec) (int, error) {
 	rows := &sql.Rows{}
 	selector, err := q.selector(ctx)
 	if err != nil {
@@ -1056,11 +1068,15 @@ func (q *query) count(ctx context.Context, drv dialect.Driver) (int, error) {
 		selector.Count(columns...)
 	}
 	query, args := selector.Query()
-	if err := drv.Query(ctx, query, args, rows); err != nil {
+	if err := r.query(StageStatement, query, args, rows); err != nil {
 		return 0, err
 	}
 	defer rows.Close()
-	return sql.ScanInt(rows)
+	n, err := sql.ScanInt(rows)
+	if err != nil {
+		return 0, r.fail(StageScan, err)
+	}
+	return n, nil
 }
 
 func (q *query) selector(ctx context.Context) (*sql.Selector, error) {

@@ -449,6 +449,9 @@ func (_q *FileQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *FileQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*File, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*File{}
 		withFKs     = _q.withFKs
@@ -487,18 +490,27 @@ func (_q *FileQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*File, e
 		return nodes, nil
 	}
 	if query := _q.withOwner; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadOwner(ctx, query, nodes, nil,
 			func(n *File, e *User) { n.Edges.Owner = e }); err != nil {
 			return nil, err
 		}
 	}
 	if query := _q.withType; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadType(ctx, query, nodes, nil,
 			func(n *File, e *FileType) { n.Edges.Type = e }); err != nil {
 			return nil, err
 		}
 	}
 	if query := _q.withField; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadField(ctx, query, nodes,
 			func(n *File) { n.Edges.Field = []*FieldType{} },
 			func(n *File, e *FieldType) { n.Edges.Field = append(n.Edges.Field, e) }); err != nil {
@@ -612,6 +624,9 @@ func (_q *FileQuery) loadField(ctx context.Context, query *FieldTypeQuery, nodes
 }
 
 func (_q *FileQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	if len(_q.modifiers) > 0 {
 		_spec.Modifiers = _q.modifiers
@@ -766,6 +781,9 @@ func (_g *FileGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *FileGroupBy) sqlScan(ctx context.Context, root *FileQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -785,7 +803,7 @@ func (_g *FileGroupBy) sqlScan(ctx context.Context, root *FileQuery, v any) erro
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -814,6 +832,9 @@ func (_s *FileSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *FileSelect) sqlScan(ctx context.Context, root *FileQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -827,7 +848,7 @@ func (_s *FileSelect) sqlScan(ctx context.Context, root *FileQuery, v any) error
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

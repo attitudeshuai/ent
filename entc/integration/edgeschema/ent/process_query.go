@@ -386,6 +386,9 @@ func (_q *ProcessQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *ProcessQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Process, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*Process{}
 		_spec       = _q.querySpec()
@@ -413,6 +416,9 @@ func (_q *ProcessQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Proc
 		return nodes, nil
 	}
 	if query := _q.withFiles; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadFiles(ctx, query, nodes,
 			func(n *Process) { n.Edges.Files = []*File{} },
 			func(n *Process, e *File) { n.Edges.Files = append(n.Edges.Files, e) }); err != nil {
@@ -420,6 +426,9 @@ func (_q *ProcessQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Proc
 		}
 	}
 	if query := _q.withAttachedFiles; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadAttachedFiles(ctx, query, nodes,
 			func(n *Process) { n.Edges.AttachedFiles = []*AttachedFile{} },
 			func(n *Process, e *AttachedFile) { n.Edges.AttachedFiles = append(n.Edges.AttachedFiles, e) }); err != nil {
@@ -522,6 +531,9 @@ func (_q *ProcessQuery) loadAttachedFiles(ctx context.Context, query *AttachedFi
 }
 
 func (_q *ProcessQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Node.Columns = _q.ctx.Fields
 	if len(_q.ctx.Fields) > 0 {
@@ -624,6 +636,9 @@ func (_g *ProcessGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *ProcessGroupBy) sqlScan(ctx context.Context, root *ProcessQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -643,7 +658,7 @@ func (_g *ProcessGroupBy) sqlScan(ctx context.Context, root *ProcessQuery, v any
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -672,6 +687,9 @@ func (_s *ProcessSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *ProcessSelect) sqlScan(ctx context.Context, root *ProcessQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -685,7 +703,7 @@ func (_s *ProcessSelect) sqlScan(ctx context.Context, root *ProcessQuery, v any)
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

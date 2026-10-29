@@ -386,6 +386,9 @@ func (_q *IntSIDQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *IntSIDQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*IntSID, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*IntSID{}
 		withFKs     = _q.withFKs
@@ -420,12 +423,18 @@ func (_q *IntSIDQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*IntSI
 		return nodes, nil
 	}
 	if query := _q.withParent; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadParent(ctx, query, nodes, nil,
 			func(n *IntSID, e *IntSID) { n.Edges.Parent = e }); err != nil {
 			return nil, err
 		}
 	}
 	if query := _q.withChildren; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadChildren(ctx, query, nodes,
 			func(n *IntSID) { n.Edges.Children = []*IntSID{} },
 			func(n *IntSID, e *IntSID) { n.Edges.Children = append(n.Edges.Children, e) }); err != nil {
@@ -500,6 +509,9 @@ func (_q *IntSIDQuery) loadChildren(ctx context.Context, query *IntSIDQuery, nod
 }
 
 func (_q *IntSIDQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Node.Columns = _q.ctx.Fields
 	if len(_q.ctx.Fields) > 0 {
@@ -602,6 +614,9 @@ func (_g *IntSIDGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *IntSIDGroupBy) sqlScan(ctx context.Context, root *IntSIDQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -621,7 +636,7 @@ func (_g *IntSIDGroupBy) sqlScan(ctx context.Context, root *IntSIDQuery, v any) 
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -650,6 +665,9 @@ func (_s *IntSIDSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *IntSIDSelect) sqlScan(ctx context.Context, root *IntSIDQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -663,7 +681,7 @@ func (_s *IntSIDSelect) sqlScan(ctx context.Context, root *IntSIDQuery, v any) e
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

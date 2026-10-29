@@ -551,6 +551,9 @@ func (_q *TweetQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *TweetQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tweet, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*Tweet{}
 		_spec       = _q.querySpec()
@@ -582,6 +585,9 @@ func (_q *TweetQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tweet,
 		return nodes, nil
 	}
 	if query := _q.withLikedUsers; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadLikedUsers(ctx, query, nodes,
 			func(n *Tweet) { n.Edges.LikedUsers = []*User{} },
 			func(n *Tweet, e *User) { n.Edges.LikedUsers = append(n.Edges.LikedUsers, e) }); err != nil {
@@ -589,6 +595,9 @@ func (_q *TweetQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tweet,
 		}
 	}
 	if query := _q.withUser; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadUser(ctx, query, nodes,
 			func(n *Tweet) { n.Edges.User = []*User{} },
 			func(n *Tweet, e *User) { n.Edges.User = append(n.Edges.User, e) }); err != nil {
@@ -596,6 +605,9 @@ func (_q *TweetQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tweet,
 		}
 	}
 	if query := _q.withTags; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadTags(ctx, query, nodes,
 			func(n *Tweet) { n.Edges.Tags = []*Tag{} },
 			func(n *Tweet, e *Tag) { n.Edges.Tags = append(n.Edges.Tags, e) }); err != nil {
@@ -603,6 +615,9 @@ func (_q *TweetQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tweet,
 		}
 	}
 	if query := _q.withLikes; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadLikes(ctx, query, nodes,
 			func(n *Tweet) { n.Edges.Likes = []*TweetLike{} },
 			func(n *Tweet, e *TweetLike) { n.Edges.Likes = append(n.Edges.Likes, e) }); err != nil {
@@ -610,6 +625,9 @@ func (_q *TweetQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tweet,
 		}
 	}
 	if query := _q.withTweetUser; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadTweetUser(ctx, query, nodes,
 			func(n *Tweet) { n.Edges.TweetUser = []*UserTweet{} },
 			func(n *Tweet, e *UserTweet) { n.Edges.TweetUser = append(n.Edges.TweetUser, e) }); err != nil {
@@ -617,6 +635,9 @@ func (_q *TweetQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tweet,
 		}
 	}
 	if query := _q.withTweetTags; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadTweetTags(ctx, query, nodes,
 			func(n *Tweet) { n.Edges.TweetTags = []*TweetTag{} },
 			func(n *Tweet, e *TweetTag) { n.Edges.TweetTags = append(n.Edges.TweetTags, e) }); err != nil {
@@ -901,6 +922,9 @@ func (_q *TweetQuery) loadTweetTags(ctx context.Context, query *TweetTagQuery, n
 }
 
 func (_q *TweetQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Node.Columns = _q.ctx.Fields
 	if len(_q.ctx.Fields) > 0 {
@@ -1003,6 +1027,9 @@ func (_g *TweetGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *TweetGroupBy) sqlScan(ctx context.Context, root *TweetQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -1022,7 +1049,7 @@ func (_g *TweetGroupBy) sqlScan(ctx context.Context, root *TweetQuery, v any) er
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -1051,6 +1078,9 @@ func (_s *TweetSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *TweetSelect) sqlScan(ctx context.Context, root *TweetQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -1064,7 +1094,7 @@ func (_s *TweetSelect) sqlScan(ctx context.Context, root *TweetQuery, v any) err
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

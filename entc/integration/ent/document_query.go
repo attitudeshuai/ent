@@ -339,6 +339,9 @@ func (_q *DocumentQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *DocumentQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Document, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes = []*Document{}
 		_spec = _q.querySpec()
@@ -362,6 +365,9 @@ func (_q *DocumentQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Doc
 	}
 	if len(nodes) == 0 {
 		return nodes, nil
+	}
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageStatement); err != nil {
+		return nil, err
 	}
 	if err := _q.loadBlobFields(ctx, nodes); err != nil {
 		return nil, err
@@ -421,6 +427,9 @@ func (_q *DocumentQuery) loadBlobFields(ctx context.Context, nodes []*Document) 
 }
 
 func (_q *DocumentQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	if len(_q.modifiers) > 0 {
 		_spec.Modifiers = _q.modifiers
@@ -561,6 +570,9 @@ func (_g *DocumentGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *DocumentGroupBy) sqlScan(ctx context.Context, root *DocumentQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -580,7 +592,7 @@ func (_g *DocumentGroupBy) sqlScan(ctx context.Context, root *DocumentQuery, v a
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -609,6 +621,9 @@ func (_s *DocumentSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *DocumentSelect) sqlScan(ctx context.Context, root *DocumentQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -622,7 +637,7 @@ func (_s *DocumentSelect) sqlScan(ctx context.Context, root *DocumentQuery, v an
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

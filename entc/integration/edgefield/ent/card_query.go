@@ -371,6 +371,9 @@ func (_q *CardQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *CardQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Card, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes       = []*Card{}
 		_spec       = _q.querySpec()
@@ -397,6 +400,9 @@ func (_q *CardQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Card, e
 		return nodes, nil
 	}
 	if query := _q.withOwner; query != nil {
+		if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+			return nil, err
+		}
 		if err := _q.loadOwner(ctx, query, nodes, nil,
 			func(n *Card, e *User) { n.Edges.Owner = e }); err != nil {
 			return nil, err
@@ -436,6 +442,9 @@ func (_q *CardQuery) loadOwner(ctx context.Context, query *UserQuery, nodes []*C
 }
 
 func (_q *CardQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	_spec.Node.Columns = _q.ctx.Fields
 	if len(_q.ctx.Fields) > 0 {
@@ -541,6 +550,9 @@ func (_g *CardGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *CardGroupBy) sqlScan(ctx context.Context, root *CardQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -560,7 +572,7 @@ func (_g *CardGroupBy) sqlScan(ctx context.Context, root *CardQuery, v any) erro
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -589,6 +601,9 @@ func (_s *CardSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *CardSelect) sqlScan(ctx context.Context, root *CardQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -602,7 +617,7 @@ func (_s *CardSelect) sqlScan(ctx context.Context, root *CardQuery, v any) error
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

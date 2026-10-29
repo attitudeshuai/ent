@@ -316,6 +316,9 @@ func (_q *GoodsQuery) prepareQuery(ctx context.Context) error {
 }
 
 func (_q *GoodsQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Goods, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes = []*Goods{}
 		_spec = _q.querySpec()
@@ -344,6 +347,9 @@ func (_q *GoodsQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Goods,
 }
 
 func (_q *GoodsQuery) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, _q.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := _q.querySpec()
 	if len(_q.modifiers) > 0 {
 		_spec.Modifiers = _q.modifiers
@@ -484,6 +490,9 @@ func (_g *GoodsGroupBy) Scan(ctx context.Context, v any) error {
 }
 
 func (_g *GoodsGroupBy) sqlScan(ctx context.Context, root *GoodsQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _g.build.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -503,7 +512,7 @@ func (_g *GoodsGroupBy) sqlScan(ctx context.Context, root *GoodsQuery, v any) er
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _g.build.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -532,6 +541,9 @@ func (_s *GoodsSelect) Scan(ctx context.Context, v any) error {
 }
 
 func (_s *GoodsSelect) sqlScan(ctx context.Context, root *GoodsQuery, v any) error {
+	if err := sqlgraph.CheckRead(ctx, _s.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return err
+	}
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -545,7 +557,7 @@ func (_s *GoodsSelect) sqlScan(ctx context.Context, root *GoodsQuery, v any) err
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
+	if err := sqlgraph.QueryRows(ctx, _s.driver, sqlgraph.OpQueryNodes, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

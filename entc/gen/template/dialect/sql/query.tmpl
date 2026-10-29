@@ -24,6 +24,11 @@ in the LICENSE file in the root directory of this source tree.
 {{ $receiver := $.Scope.Receiver }}
 
 func ({{ $receiver }} *{{ $builder }}) sqlAll(ctx context.Context, hooks ...queryHook) ([]*{{ $.Name }}, error) {
+	{{- /* The whole logical read is one execution unit: gate the entry on
+	     cancellation/deadline before any statement is issued. */}}
+	if err := sqlgraph.CheckRead(ctx, {{ $receiver }}.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEntry); err != nil {
+		return nil, err
+	}
 	var (
 		nodes = []*{{ $.Name }}{}
 		{{- with $.UnexportedForeignKeys }}
@@ -78,6 +83,11 @@ func ({{ $receiver }} *{{ $builder }}) sqlAll(ctx context.Context, hooks ...quer
 	}
 	{{- range $e := $.Edges }}
 		if query := {{ $receiver }}.{{ $e.EagerLoadField }}; query != nil {
+			{{- /* Revalidate the context before every derived eager-loading
+			     statement, so a timed-out read does not fan out further. */}}
+			if err := sqlgraph.CheckRead(ctx, {{ $receiver }}.driver, sqlgraph.OpQueryNodes, sqlgraph.StageEagerLoad); err != nil {
+				return nil, err
+			}
 			if err := {{ $receiver }}.load{{ $e.StructField }}(ctx, query, nodes, {{ if $e.Unique }}nil{{ else }}
 				func(n *{{ $.Name }}){ n.Edges.{{ $e.StructField }} = []*{{ $e.Type.Name }}{} }{{ end }},
 				{{- $lhs := printf "n.Edges.%s" $e.StructField }}
@@ -106,6 +116,9 @@ func ({{ $receiver }} *{{ $builder }}) sqlAll(ctx context.Context, hooks ...quer
 		{{- end }}
 	{{- end }}
 	{{- if $.HasLoadOnScanFields }}
+	if err := sqlgraph.CheckRead(ctx, {{ $receiver }}.driver, sqlgraph.OpQueryNodes, sqlgraph.StageStatement); err != nil {
+		return nil, err
+	}
 	if err := {{ $receiver }}.loadBlobFields(ctx, nodes); err != nil {
 		return nil, err
 	}
@@ -362,6 +375,9 @@ func ({{ $receiver }} *{{ $builder }}) loadBlobFields(ctx context.Context, nodes
 {{- end }}
 
 func ({{ $receiver }} *{{ $builder }}) sqlCount(ctx context.Context) (int, error) {
+	if err := sqlgraph.CheckRead(ctx, {{ $receiver }}.driver, sqlgraph.OpCountNodes, sqlgraph.StageEntry); err != nil {
+		return 0, err
+	}
 	_spec := {{ $receiver }}.querySpec()
 	{{- /* Allow mutating the sqlgraph.QuerySpec by ent extensions or user templates. */}}
 	{{- with $tmpls := matchTemplate "dialect/sql/query/spec/*" }}
